@@ -1,0 +1,17 @@
+const json = require("json-server")
+const rst = require('json-server-reset')
+const stap = require('json-server-reset/src/set-app')
+const bdyprsr = require('json-server/lib/server/body-parser')
+const db = require("./db.js")
+const svr = json.create()
+const rtr = json.router(db())
+const mdwr = json.defaults()
+
+svr.use(stap(svr, rtr.db))
+svr.use(bdyprsr)
+svr.use(rst)
+svr.use(mdwr)
+svr.use(rtr)
+svr.listen(3000, () => {
+    console.log("Server has started")
+})

@@ -1,0 +1,13 @@
+[Unit]
+Description=Raspberry Pi Bluetooth Program System Service
+After=multi-user.target
+
+[Service]
+Type=simple
+Restart=always
+User=root
+Group=root
+ExecStart=/usr/bin/python3 "/<file_location>/BluetoothProgram.py"
+
+[Install]
+WantedBy=multi-user.target
