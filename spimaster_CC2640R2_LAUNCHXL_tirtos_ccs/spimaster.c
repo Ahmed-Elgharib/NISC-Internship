@@ -113,35 +113,12 @@ void *masterThread(void *arg0)
      * Below we set Board_SPI_MASTER_READY & Board_SPI_SLAVE_READY initial
      * conditions for the 'handshake'.
      */
-    GPIO_setConfig(Board_SPI_MASTER_READY, GPIO_CFG_OUTPUT | GPIO_CFG_OUT_LOW);
-    GPIO_setConfig(Board_SPI_SLAVE_READY, GPIO_CFG_INPUT);
 
-    /*
-     * Handshake - Set Board_SPI_MASTER_READY high to indicate master is ready
-     * to run.  Wait Board_SPI_SLAVE_READY to be high.
-     */
-    GPIO_write(Board_SPI_MASTER_READY, 1);
-    while (GPIO_read(Board_SPI_SLAVE_READY) == 0) {}
 
-    /* Handshake complete; now configure interrupt on Board_SPI_SLAVE_READY */
-    GPIO_setConfig(Board_SPI_SLAVE_READY, GPIO_CFG_IN_PU | GPIO_CFG_IN_INT_FALLING);
-    GPIO_setCallback(Board_SPI_SLAVE_READY, slaveReadyFxn);
-    GPIO_enableInt(Board_SPI_SLAVE_READY);
-
-    /*
-     * Create synchronization semaphore; the master will wait on this semaphore
-     * until the slave is ready.
-     */
-    status = sem_init(&masterSem, 0, 0);
-    if (status != 0) {
-        Display_printf(display, 0, 0, "Error creating masterSem\n");
-
-        while(1);
-    }
 
     /* Open SPI as master (default) */
     SPI_Params_init(&spiParams);
-    spiParams.frameFormat = SPI_POL0_PHA1;
+    spiParams.frameFormat = SPI_POL0_PHA0;
     spiParams.bitRate = 4000000;
     masterSpi = SPI_open(Board_SPI_MASTER, &spiParams);
     if (masterSpi == NULL) {
@@ -156,17 +133,13 @@ void *masterThread(void *arg0)
      * Master has opened Board_SPI_MASTER; set Board_SPI_MASTER_READY high to
      * inform the slave.
      */
-    GPIO_write(Board_SPI_MASTER_READY, 0);
+    GPIO_write(CC2640R2_LAUNCHXL_SPI0_CSN, GPIO_CFG_OUT_LOW);
+
 
     /* Copy message to transmit buffer */
     strncpy((char *) masterTxBuffer, MASTER_MSG, SPI_MSG_LENGTH);
 
     for (i = 0; i < MAX_LOOP; i++) {
-        /*
-         * Wait until slave is ready for transfer; slave will pull
-         * Board_SPI_SLAVE_READY low.
-         */
-        sem_wait(&masterSem);
 
         /* Initialize master SPI transaction structure */
         masterTxBuffer[sizeof(MASTER_MSG) - 1] = (i % 10) + '0';
@@ -182,6 +155,8 @@ void *masterThread(void *arg0)
         transferOK = SPI_transfer(masterSpi, &transaction);
         if (transferOK) {
             Display_printf(display, 0, 0, "Master received: %s", masterRxBuffer);
+            if (masterRxBuffer == "Hello2")
+                GPIO_write(Board_GPIO_LED0, 0);
         }
         else {
             Display_printf(display, 0, 0, "Unsuccessful master SPI transfer");
@@ -194,9 +169,7 @@ void *masterThread(void *arg0)
     SPI_close(masterSpi);
 
     /* Example complete - set pins to a known state */
-    GPIO_disableInt(Board_SPI_SLAVE_READY);
-    GPIO_setConfig(Board_SPI_SLAVE_READY, GPIO_CFG_OUTPUT | GPIO_CFG_OUT_LOW);
-    GPIO_write(Board_SPI_MASTER_READY, 0);
+    GPIO_write(Board_SPI_FLASH_CS, Board_FLASH_CS_OFF);
 
     Display_printf(display, 0, 0, "\nDone");
 
